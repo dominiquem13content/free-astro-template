@@ -104,12 +104,14 @@ const { user, profile } = currentUser;
 
   <script>
     import { supabase, type Author, type Category, type Tag, type Post } from '../lib/supabase';
-    import { generateSlug } from '../lib/markdown';
+    import { generateSlug, parseMarkdown } from '../lib/markdown';
+    import { marked } from 'marked';
 
     let currentEditingPost: Post | null = null;
     let currentEditingAuthor: Author | null = null;
     let currentEditingCategory: Category | null = null;
     let currentEditingTag: Tag | null = null;
+    let previewDebounceTimer: number | null = null;
 
     function showToast(message: string, type: 'success' | 'error' = 'success') {
       const toast = document.getElementById('toast');
@@ -286,13 +288,31 @@ const { user, profile } = currentUser;
           </div>
 
           <div>
-            <label class="block mb-2 font-medium">Content * (Markdown)</label>
-            <textarea id="post-content" rows="12" class="w-full px-4 py-2 rounded bg-gray-800 border border-gray-700 focus:border-blue-500 focus:outline-none font-mono text-sm" required placeholder="# Your post content in markdown...
+            <div class="flex justify-between items-center mb-2">
+              <label class="font-medium">Content * (Markdown)</label>
+              <div class="flex gap-2">
+                <button type="button" id="view-mode-edit" class="view-mode-btn px-3 py-1 text-sm rounded bg-blue-600 hover:bg-blue-700 transition">Edit</button>
+                <button type="button" id="view-mode-split" class="view-mode-btn px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 transition">Split</button>
+                <button type="button" id="view-mode-preview" class="view-mode-btn px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 transition">Preview</button>
+              </div>
+            </div>
+            <div id="editor-container" class="border border-gray-700 rounded overflow-hidden">
+              <div class="editor-split-view">
+                <div id="editor-pane" class="editor-pane">
+                  <textarea id="post-content" rows="20" class="w-full h-full px-4 py-2 bg-gray-800 border-0 focus:outline-none font-mono text-sm resize-none" required placeholder="# Your post content in markdown...
 
 **Bold text**, *italic text*, [links](https://example.com)
 
 - List items
 - More items">${post?.content || ''}</textarea>
+                </div>
+                <div id="preview-pane" class="preview-pane hidden">
+                  <div id="preview-content" class="prose prose-invert max-w-none px-4 py-2 bg-gray-900">
+                    <p class="text-gray-500 italic">Start typing to see preview...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>
@@ -385,6 +405,85 @@ const { user, profile } = currentUser;
         container.classList.add('hidden');
         currentEditingPost = null;
       });
+
+      setupPreviewFunctionality();
+    }
+
+    function setupPreviewFunctionality() {
+      const contentTextarea = document.getElementById('post-content') as HTMLTextAreaElement;
+      const previewContent = document.getElementById('preview-content');
+      const editorPane = document.getElementById('editor-pane');
+      const previewPane = document.getElementById('preview-pane');
+      const editModeBtn = document.getElementById('view-mode-edit');
+      const splitModeBtn = document.getElementById('view-mode-split');
+      const previewModeBtn = document.getElementById('view-mode-preview');
+
+      if (!contentTextarea || !previewContent || !editorPane || !previewPane) return;
+
+      async function updatePreview() {
+        const content = contentTextarea.value.trim();
+        if (!content) {
+          previewContent.innerHTML = '<p class="text-gray-500 italic">Start typing to see preview...</p>';
+          return;
+        }
+
+        try {
+          const html = await marked.parse(content);
+          previewContent.innerHTML = html;
+        } catch (error) {
+          console.error('Error rendering preview:', error);
+          previewContent.innerHTML = '<p class="text-red-400">Error rendering preview</p>';
+        }
+      }
+
+      function debouncePreview() {
+        if (previewDebounceTimer) {
+          clearTimeout(previewDebounceTimer);
+        }
+        previewDebounceTimer = window.setTimeout(updatePreview, 300);
+      }
+
+      contentTextarea.addEventListener('input', debouncePreview);
+
+      function setViewMode(mode: 'edit' | 'split' | 'preview') {
+        document.querySelectorAll('.view-mode-btn').forEach(btn => {
+          btn.classList.remove('bg-blue-600');
+          btn.classList.add('bg-gray-700');
+        });
+
+        if (mode === 'edit') {
+          editorPane.classList.remove('hidden');
+          previewPane.classList.add('hidden');
+          editorPane.classList.remove('split-view');
+          previewPane.classList.remove('split-view');
+          editModeBtn?.classList.add('bg-blue-600');
+          editModeBtn?.classList.remove('bg-gray-700');
+        } else if (mode === 'split') {
+          editorPane.classList.remove('hidden');
+          previewPane.classList.remove('hidden');
+          editorPane.classList.add('split-view');
+          previewPane.classList.add('split-view');
+          splitModeBtn?.classList.add('bg-blue-600');
+          splitModeBtn?.classList.remove('bg-gray-700');
+          updatePreview();
+        } else if (mode === 'preview') {
+          editorPane.classList.add('hidden');
+          previewPane.classList.remove('hidden');
+          editorPane.classList.remove('split-view');
+          previewPane.classList.remove('split-view');
+          previewModeBtn?.classList.add('bg-blue-600');
+          previewModeBtn?.classList.remove('bg-gray-700');
+          updatePreview();
+        }
+      }
+
+      editModeBtn?.addEventListener('click', () => setViewMode('edit'));
+      splitModeBtn?.addEventListener('click', () => setViewMode('split'));
+      previewModeBtn?.addEventListener('click', () => setViewMode('preview'));
+
+      if (contentTextarea.value.trim()) {
+        updatePreview();
+      }
     }
 
     async function savePost() {
@@ -1084,6 +1183,179 @@ const { user, profile } = currentUser;
   <style>
     .admin-nav-btn.active {
       background-color: rgb(37 99 235);
+    }
+
+    .editor-split-view {
+      display: flex;
+      min-height: 500px;
+      background: rgb(31 41 55);
+    }
+
+    .editor-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .editor-pane.split-view {
+      flex: 1;
+      border-right: 1px solid rgb(55 65 81);
+    }
+
+    .preview-pane {
+      flex: 1;
+      overflow-y: auto;
+      background: rgb(17 24 39);
+    }
+
+    .preview-pane.split-view {
+      flex: 1;
+    }
+
+    #preview-content {
+      min-height: 500px;
+      line-height: 1.7;
+    }
+
+    #preview-content h1 {
+      color: rgb(243 244 246);
+      font-size: 2.25em;
+      margin-top: 1em;
+      margin-bottom: 0.5em;
+      font-weight: 700;
+    }
+
+    #preview-content h2 {
+      color: rgb(243 244 246);
+      font-size: 1.875em;
+      margin-top: 1em;
+      margin-bottom: 0.5em;
+      font-weight: 700;
+    }
+
+    #preview-content h3 {
+      color: rgb(243 244 246);
+      font-size: 1.5em;
+      margin-top: 1em;
+      margin-bottom: 0.5em;
+      font-weight: 600;
+    }
+
+    #preview-content h4 {
+      color: rgb(243 244 246);
+      font-size: 1.25em;
+      margin-top: 0.75em;
+      margin-bottom: 0.5em;
+      font-weight: 600;
+    }
+
+    #preview-content p {
+      color: rgb(209 213 219);
+      margin-bottom: 1em;
+    }
+
+    #preview-content a {
+      color: rgb(96 165 250);
+      text-decoration: underline;
+    }
+
+    #preview-content a:hover {
+      color: rgb(147 197 253);
+    }
+
+    #preview-content ul,
+    #preview-content ol {
+      margin-bottom: 1em;
+      padding-left: 1.5em;
+      color: rgb(209 213 219);
+    }
+
+    #preview-content li {
+      margin-bottom: 0.5em;
+    }
+
+    #preview-content code {
+      background: rgb(55 65 81);
+      color: rgb(252 165 165);
+      padding: 0.25em 0.5em;
+      border-radius: 0.25em;
+      font-size: 0.875em;
+      font-family: 'Courier New', monospace;
+    }
+
+    #preview-content pre {
+      background: rgb(31 41 55);
+      border: 1px solid rgb(55 65 81);
+      border-radius: 0.5em;
+      padding: 1em;
+      overflow-x: auto;
+      margin-bottom: 1em;
+    }
+
+    #preview-content pre code {
+      background: transparent;
+      color: rgb(229 231 235);
+      padding: 0;
+      font-size: 0.875em;
+    }
+
+    #preview-content blockquote {
+      border-left: 4px solid rgb(96 165 250);
+      padding-left: 1em;
+      margin: 1em 0;
+      color: rgb(156 163 175);
+      font-style: italic;
+    }
+
+    #preview-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.5em;
+      margin: 1em 0;
+    }
+
+    #preview-content hr {
+      border: none;
+      border-top: 1px solid rgb(55 65 81);
+      margin: 2em 0;
+    }
+
+    #preview-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1em;
+    }
+
+    #preview-content table th,
+    #preview-content table td {
+      border: 1px solid rgb(55 65 81);
+      padding: 0.5em;
+      text-align: left;
+    }
+
+    #preview-content table th {
+      background: rgb(31 41 55);
+      color: rgb(243 244 246);
+      font-weight: 600;
+    }
+
+    #preview-content table td {
+      color: rgb(209 213 219);
+    }
+
+    @media (max-width: 1024px) {
+      .editor-split-view {
+        flex-direction: column;
+      }
+
+      .editor-pane.split-view {
+        border-right: none;
+        border-bottom: 1px solid rgb(55 65 81);
+      }
+
+      #preview-content {
+        min-height: 300px;
+      }
     }
   </style>
 </body>

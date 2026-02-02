@@ -66,6 +66,7 @@ const readingTimeMin = calculateReadingTimeFromHtml(htmlContent);
 	prevPost={prev}
 	nextPost={next}
 	readingTimeMin={readingTimeMin}
+	slug={post.slug}
 >
 	<div set:html={htmlContent} />
 </BlogPost>

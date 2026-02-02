@@ -1,0 +1,48 @@
+---
+import type { ComparisonTableData } from '../../../lib/cms-types';
+
+interface Props {
+  title?: string | null;
+  data: ComparisonTableData;
+}
+
+const { title, data } = Astro.props;
+const headers = data.headers || [];
+const rows = data.rows || [];
+---
+
+{headers.length > 0 && rows.length > 0 && (
+  <section class="cms-comparison-table my-12">
+    {title && <h2 class="text-3xl font-bold mb-6">{title}</h2>}
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full border border-gray-200 rounded-lg overflow-hidden">
+        <thead class="bg-gray-100">
+          <tr>
+            {headers.map((header, index) => (
+              <th
+                class={`px-6 py-4 text-left font-semibold ${index === 0 ? 'text-gray-900' : 'text-center'}`}
+              >
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr class={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+              <td class="px-6 py-4 font-medium text-gray-900 border-t border-gray-200">
+                {row.label}
+              </td>
+              {row.values.map(value => (
+                <td class="px-6 py-4 text-center border-t border-gray-200">
+                  {value}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+)}

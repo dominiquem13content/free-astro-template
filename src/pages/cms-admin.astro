@@ -1,0 +1,418 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/sections/Header.astro';
+import Footer from '../components/sections/Footer.astro';
+import { SITE_TITLE } from '../consts';
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark" class="dark">
+<head>
+  <BaseHead title={`CMS Admin - ${SITE_TITLE}`} description="Manage page content sections" />
+</head>
+<body>
+  <Header />
+  <main class="use-utility-layout mx-auto max-w-7xl px-3 py-5">
+    <div class="mb-8">
+      <h1 class="text-4xl font-bold mb-2">CMS Content Manager</h1>
+      <p class="text-gray-400">Manage flexible content sections for your pages</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-1">
+        <div class="card-surface p-6 sticky top-4">
+          <h2 class="text-2xl font-bold mb-4">Page Selection</h2>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">Page Type</label>
+              <select id="page-type-select" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded">
+                <option value="blog_post">Blog Post</option>
+                <option value="blog_category">Blog Category</option>
+                <option value="blog_tag">Blog Tag</option>
+                <option value="blog_author">Blog Author</option>
+                <option value="homepage">Homepage</option>
+                <option value="about">About Page</option>
+                <option value="portfolio">Portfolio</option>
+                <option value="custom">Custom Page</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">Page ID/Slug</label>
+              <input
+                type="text"
+                id="page-id-input"
+                placeholder="e.g., example-post-1"
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded"
+              />
+            </div>
+
+            <button
+              id="load-sections-btn"
+              class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition font-medium"
+            >
+              Load Sections
+            </button>
+          </div>
+
+          <div class="mt-6 pt-6 border-t border-gray-700">
+            <button
+              id="add-section-btn"
+              class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition font-medium"
+            >
+              + Add New Section
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-2">
+        <div id="toast" class="hidden fixed top-4 right-4 px-6 py-3 rounded shadow-lg z-50"></div>
+
+        <div id="sections-container" class="space-y-4">
+          <div class="card-surface p-6 text-center text-gray-400">
+            <p>Select a page and click "Load Sections" to manage content</p>
+          </div>
+        </div>
+
+        <div id="section-form" class="hidden card-surface p-6 mt-6">
+          <h3 class="text-2xl font-bold mb-4">Section Editor</h3>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">Section Type</label>
+              <select id="section-type" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded">
+                <option value="rich_text">Rich Text</option>
+                <option value="faq_accordion">FAQ Accordion</option>
+                <option value="comparison_table">Comparison Table</option>
+                <option value="callout_box">Callout Box</option>
+                <option value="checklist">Checklist</option>
+                <option value="numbered_steps">Numbered Steps</option>
+                <option value="feature_highlights">Feature Highlights</option>
+                <option value="two_column_text">Two Column Text</option>
+                <option value="cta_banner">CTA Banner</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">Title (optional)</label>
+              <input
+                type="text"
+                id="section-title"
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">Content (Markdown supported)</label>
+              <textarea
+                id="section-content"
+                rows="6"
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded font-mono text-sm"
+              ></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">Content Data (JSON)</label>
+              <textarea
+                id="section-data"
+                rows="10"
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded font-mono text-sm"
+                placeholder='{"key": "value"}'
+              ></textarea>
+              <p class="text-xs text-gray-500 mt-1">Enter structured data as JSON. Examples provided in docs.</p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">Sort Order</label>
+              <input
+                type="number"
+                id="section-order"
+                value="10"
+                step="10"
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded"
+              />
+            </div>
+
+            <div class="flex gap-3">
+              <button
+                id="save-section-btn"
+                class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition font-medium"
+              >
+                Save Section
+              </button>
+              <button
+                id="cancel-section-btn"
+                class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <Footer />
+
+  <script>
+    import { supabase } from '../lib/supabase';
+    import type { ContentSection } from '../lib/cms-types';
+
+    let currentPageType = 'blog_post';
+    let currentPageId = '';
+    let editingSection: ContentSection | null = null;
+
+    function showToast(message: string, type: 'success' | 'error' = 'success') {
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+
+      toast.textContent = message;
+      toast.className = `fixed top-4 right-4 px-6 py-3 rounded shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-600' : 'bg-red-600'
+      } text-white`;
+      toast.classList.remove('hidden');
+
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3000);
+    }
+
+    async function loadSections() {
+      const pageType = (document.getElementById('page-type-select') as HTMLSelectElement).value;
+      const pageId = (document.getElementById('page-id-input') as HTMLInputElement).value.trim();
+
+      if (!pageId) {
+        showToast('Please enter a page ID/slug', 'error');
+        return;
+      }
+
+      currentPageType = pageType;
+      currentPageId = pageId;
+
+      const container = document.getElementById('sections-container');
+      if (!container) return;
+
+      container.innerHTML = '<div class="card-surface p-6 text-center text-gray-400">Loading sections...</div>';
+
+      try {
+        const { data: sections, error } = await supabase
+          .from('page_content_sections')
+          .select('*')
+          .eq('page_type', pageType)
+          .eq('page_id', pageId)
+          .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+
+        if (!sections || sections.length === 0) {
+          container.innerHTML = `
+            <div class="card-surface p-6 text-center text-gray-400">
+              <p>No sections found for this page.</p>
+              <p class="text-sm mt-2">Click "Add New Section" to create one.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = sections.map((section: ContentSection) => `
+          <div class="card-surface p-6" data-section-id="${section.id}">
+            <div class="flex justify-between items-start mb-3">
+              <div>
+                <span class="px-2 py-1 bg-blue-600 rounded text-xs font-medium">${section.section_type}</span>
+                ${section.title ? `<h3 class="text-xl font-bold mt-2">${section.title}</h3>` : ''}
+              </div>
+              <div class="flex gap-2">
+                <button class="edit-section-btn px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm" data-id="${section.id}">
+                  Edit
+                </button>
+                <button class="delete-section-btn px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm" data-id="${section.id}">
+                  Delete
+                </button>
+                <button class="toggle-section-btn px-3 py-1 ${section.is_active ? 'bg-green-600' : 'bg-gray-600'} hover:opacity-80 rounded text-sm" data-id="${section.id}">
+                  ${section.is_active ? 'Active' : 'Inactive'}
+                </button>
+              </div>
+            </div>
+            <div class="text-sm text-gray-400">
+              <p>Order: ${section.sort_order}</p>
+              ${section.content ? `<p class="mt-2 truncate">Content: ${section.content.substring(0, 100)}...</p>` : ''}
+            </div>
+          </div>
+        `).join('');
+
+        attachEventListeners();
+      } catch (error) {
+        console.error('Error loading sections:', error);
+        showToast('Failed to load sections', 'error');
+      }
+    }
+
+    function attachEventListeners() {
+      document.querySelectorAll('.edit-section-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = (e.target as HTMLElement).dataset.id;
+          if (!id) return;
+
+          const { data: section, error } = await supabase
+            .from('page_content_sections')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+          if (error || !section) {
+            showToast('Failed to load section', 'error');
+            return;
+          }
+
+          editingSection = section as ContentSection;
+          showSectionForm(section as ContentSection);
+        });
+      });
+
+      document.querySelectorAll('.delete-section-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          if (!confirm('Are you sure you want to delete this section?')) return;
+
+          const id = (e.target as HTMLElement).dataset.id;
+          if (!id) return;
+
+          const { error } = await supabase
+            .from('page_content_sections')
+            .delete()
+            .eq('id', id);
+
+          if (error) {
+            showToast('Failed to delete section', 'error');
+            return;
+          }
+
+          showToast('Section deleted successfully');
+          loadSections();
+        });
+      });
+
+      document.querySelectorAll('.toggle-section-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = (e.target as HTMLElement).dataset.id;
+          if (!id) return;
+
+          const { data: section } = await supabase
+            .from('page_content_sections')
+            .select('is_active')
+            .eq('id', id)
+            .single();
+
+          if (!section) return;
+
+          const { error } = await supabase
+            .from('page_content_sections')
+            .update({ is_active: !section.is_active })
+            .eq('id', id);
+
+          if (error) {
+            showToast('Failed to toggle section', 'error');
+            return;
+          }
+
+          showToast('Section updated successfully');
+          loadSections();
+        });
+      });
+    }
+
+    function showSectionForm(section?: ContentSection) {
+      const form = document.getElementById('section-form');
+      if (!form) return;
+
+      form.classList.remove('hidden');
+
+      if (section) {
+        (document.getElementById('section-type') as HTMLSelectElement).value = section.section_type;
+        (document.getElementById('section-title') as HTMLInputElement).value = section.title || '';
+        (document.getElementById('section-content') as HTMLTextAreaElement).value = section.content || '';
+        (document.getElementById('section-data') as HTMLTextAreaElement).value = JSON.stringify(section.content_data, null, 2);
+        (document.getElementById('section-order') as HTMLInputElement).value = section.sort_order.toString();
+      } else {
+        (document.getElementById('section-type') as HTMLSelectElement).value = 'rich_text';
+        (document.getElementById('section-title') as HTMLInputElement).value = '';
+        (document.getElementById('section-content') as HTMLTextAreaElement).value = '';
+        (document.getElementById('section-data') as HTMLTextAreaElement).value = '{}';
+        (document.getElementById('section-order') as HTMLInputElement).value = '10';
+      }
+
+      form.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    document.getElementById('load-sections-btn')?.addEventListener('click', loadSections);
+
+    document.getElementById('add-section-btn')?.addEventListener('click', () => {
+      if (!currentPageId) {
+        showToast('Please load a page first', 'error');
+        return;
+      }
+      editingSection = null;
+      showSectionForm();
+    });
+
+    document.getElementById('cancel-section-btn')?.addEventListener('click', () => {
+      document.getElementById('section-form')?.classList.add('hidden');
+      editingSection = null;
+    });
+
+    document.getElementById('save-section-btn')?.addEventListener('click', async () => {
+      const sectionType = (document.getElementById('section-type') as HTMLSelectElement).value;
+      const title = (document.getElementById('section-title') as HTMLInputElement).value;
+      const content = (document.getElementById('section-content') as HTMLTextAreaElement).value;
+      const dataStr = (document.getElementById('section-data') as HTMLTextAreaElement).value;
+      const sortOrder = parseInt((document.getElementById('section-order') as HTMLInputElement).value);
+
+      let contentData = {};
+      try {
+        contentData = JSON.parse(dataStr);
+      } catch (e) {
+        showToast('Invalid JSON in content data', 'error');
+        return;
+      }
+
+      const sectionData = {
+        page_type: currentPageType,
+        page_id: currentPageId,
+        section_type: sectionType,
+        title: title || null,
+        content: content || null,
+        content_data: contentData,
+        sort_order: sortOrder,
+        is_active: true,
+      };
+
+      try {
+        if (editingSection) {
+          const { error } = await supabase
+            .from('page_content_sections')
+            .update(sectionData)
+            .eq('id', editingSection.id);
+
+          if (error) throw error;
+          showToast('Section updated successfully');
+        } else {
+          const { error } = await supabase
+            .from('page_content_sections')
+            .insert(sectionData);
+
+          if (error) throw error;
+          showToast('Section created successfully');
+        }
+
+        document.getElementById('section-form')?.classList.add('hidden');
+        editingSection = null;
+        loadSections();
+      } catch (error) {
+        console.error('Error saving section:', error);
+        showToast('Failed to save section', 'error');
+      }
+    });
+  </script>
+</body>
+</html>

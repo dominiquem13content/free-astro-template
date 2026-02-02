@@ -1,0 +1,41 @@
+---
+import type { CTABannerData } from '../../../lib/cms-types';
+import { marked } from 'marked';
+
+interface Props {
+  title?: string | null;
+  content?: string | null;
+  data: CTABannerData;
+}
+
+const { title, content, data } = Astro.props;
+const htmlContent = content ? marked(content) : '';
+---
+
+<section class="cms-cta-banner my-12 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl p-8 md:p-12">
+  <div class="max-w-3xl mx-auto text-center">
+    {title && <h2 class="text-4xl font-bold mb-4">{title}</h2>}
+    {content && (
+      <div class="prose prose-lg prose-invert max-w-none mb-8" set:html={htmlContent} />
+    )}
+
+    <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+      {data.primary_button_text && data.primary_button_url && (
+        <a
+          href={data.primary_button_url}
+          class="px-8 py-4 bg-white text-blue-700 font-bold rounded-lg hover:bg-gray-100 transition-colors inline-block"
+        >
+          {data.primary_button_text}
+        </a>
+      )}
+      {data.secondary_button_text && data.secondary_button_url && (
+        <a
+          href={data.secondary_button_url}
+          class="px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white hover:text-blue-700 transition-colors inline-block"
+        >
+          {data.secondary_button_text}
+        </a>
+      )}
+    </div>
+  </div>
+</section>

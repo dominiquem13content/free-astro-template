@@ -1,0 +1,19 @@
+---
+import { marked } from 'marked';
+
+interface Props {
+  title?: string | null;
+  content?: string | null;
+}
+
+const { title, content } = Astro.props;
+
+const htmlContent = content ? marked(content) : '';
+---
+
+{(title || content) && (
+  <section class="cms-rich-text prose prose-lg max-w-none my-8">
+    {title && <h2 class="text-3xl font-bold mb-4">{title}</h2>}
+    {content && <div set:html={htmlContent} />}
+  </section>
+)}

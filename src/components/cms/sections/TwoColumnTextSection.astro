@@ -1,0 +1,32 @@
+---
+import type { TwoColumnTextData } from '../../../lib/cms-types';
+import { marked } from 'marked';
+
+interface Props {
+  title?: string | null;
+  data: TwoColumnTextData;
+}
+
+const { title, data } = Astro.props;
+const leftHtml = data.left_column ? marked(data.left_column) : '';
+const rightHtml = data.right_column ? marked(data.right_column) : '';
+---
+
+{(data.left_column || data.right_column) && (
+  <section class="cms-two-column my-12">
+    {title && <h2 class="text-3xl font-bold mb-8">{title}</h2>}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      {data.left_column && (
+        <div class="prose prose-lg max-w-none">
+          <div set:html={leftHtml} />
+        </div>
+      )}
+      {data.right_column && (
+        <div class="prose prose-lg max-w-none">
+          <div set:html={rightHtml} />
+        </div>
+      )}
+    </div>
+  </section>
+)}

@@ -1,0 +1,71 @@
+---
+import type { ContentSection } from '../../lib/cms-types';
+import RichTextSection from './sections/RichTextSection.astro';
+import FAQAccordionSection from './sections/FAQAccordionSection.astro';
+import ComparisonTableSection from './sections/ComparisonTableSection.astro';
+import CalloutBoxSection from './sections/CalloutBoxSection.astro';
+import ChecklistSection from './sections/ChecklistSection.astro';
+import NumberedStepsSection from './sections/NumberedStepsSection.astro';
+import FeatureHighlightsSection from './sections/FeatureHighlightsSection.astro';
+import TwoColumnTextSection from './sections/TwoColumnTextSection.astro';
+import CTABannerSection from './sections/CTABannerSection.astro';
+
+interface Props {
+  section: ContentSection;
+}
+
+const { section } = Astro.props;
+
+if (!section.is_active) {
+  return null;
+}
+---
+
+<div class="cms-section" data-section-id={section.id} data-section-type={section.section_type}>
+  {section.section_type === 'rich_text' && (
+    <RichTextSection title={section.title} content={section.content} />
+  )}
+
+  {section.section_type === 'faq_accordion' && (
+    <FAQAccordionSection
+      title={section.title}
+      faqs={(section.content_data as any).faqs || []}
+    />
+  )}
+
+  {section.section_type === 'comparison_table' && (
+    <ComparisonTableSection title={section.title} data={section.content_data as any} />
+  )}
+
+  {section.section_type === 'callout_box' && (
+    <CalloutBoxSection
+      title={section.title}
+      content={section.content}
+      data={section.content_data as any}
+    />
+  )}
+
+  {section.section_type === 'checklist' && (
+    <ChecklistSection title={section.title} data={section.content_data as any} />
+  )}
+
+  {section.section_type === 'numbered_steps' && (
+    <NumberedStepsSection title={section.title} data={section.content_data as any} />
+  )}
+
+  {section.section_type === 'feature_highlights' && (
+    <FeatureHighlightsSection title={section.title} data={section.content_data as any} />
+  )}
+
+  {section.section_type === 'two_column_text' && (
+    <TwoColumnTextSection title={section.title} data={section.content_data as any} />
+  )}
+
+  {section.section_type === 'cta_banner' && (
+    <CTABannerSection
+      title={section.title}
+      content={section.content}
+      data={section.content_data as any}
+    />
+  )}
+</div>

@@ -6,6 +6,8 @@ import Header from '../components/sections/Header.astro';
 import PostMeta from '../components/ui/meta/PostMeta.astro';
 import ShareButtons from '../components/ui/share/ShareButtons.astro';
 import PostNav from '../components/ui/nav/PostNav.astro';
+import ContentSection from '../components/cms/ContentSection.astro';
+import { getPageContentSections, getPageSEOContent } from '../lib/cms';
 
 interface Props {
   title: string;
@@ -19,9 +21,13 @@ interface Props {
   prevPost?: { id: string; title: string } | null;
   nextPost?: { id: string; title: string } | null;
   readingTimeMin?: number;
+  slug?: string;
 }
 
-const { title, description, pubDate, updatedDate, heroImage, author, tags, showHeader = true, prevPost = null, nextPost = null, readingTimeMin = 0 } = Astro.props;
+const { title, description, pubDate, updatedDate, heroImage, author, tags, showHeader = true, prevPost = null, nextPost = null, readingTimeMin = 0, slug } = Astro.props;
+
+const cmsSections = slug ? await getPageContentSections('blog_post', slug) : [];
+const seoContent = slug ? await getPageSEOContent('blog_post', slug) : null;
 ---
 
 <html lang="en" data-theme="dark" class="dark">
@@ -133,7 +139,21 @@ const { title, description, pubDate, updatedDate, heroImage, author, tags, showH
                     )}
                     <ShareButtons title={title} url={Astro.url.toString()} />
 					<PostMeta pubDate={pubDate} readingTimeMin={readingTimeMin} authorName={author || 'Site Author'} />
+
+                    {seoContent?.intro_text && (
+                        <div class="cms-seo-intro mb-8" set:html={seoContent.intro_text} />
+                    )}
+
                     <slot />
+
+                    {cmsSections.map(section => (
+                        <ContentSection section={section} />
+                    ))}
+
+                    {seoContent?.bottom_content && (
+                        <div class="cms-seo-bottom mt-8" set:html={seoContent.bottom_content} />
+                    )}
+
                     <PostNav prev={prevPost} next={nextPost} />
                 </div>
 			</article>

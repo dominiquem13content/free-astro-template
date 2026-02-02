@@ -1,19 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const getEnvVar = (key: string): string => {
-  if (typeof import.meta.env !== 'undefined') {
-    return import.meta.env[key] || import.meta.env[`VITE_${key.replace('PUBLIC_', '')}`] || '';
-  }
-
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env[key] || process.env[`VITE_${key.replace('PUBLIC_', '')}`] || '';
-  }
-
-  return '';
-};
-
-const supabaseUrl = getEnvVar('PUBLIC_SUPABASE_URL');
-const supabaseAnonKey = getEnvVar('PUBLIC_SUPABASE_ANON_KEY');
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl) {
   throw new Error(

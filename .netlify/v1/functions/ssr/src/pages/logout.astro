@@ -1,0 +1,10 @@
+---
+export const prerender = false;
+
+import { signOut, clearAuthCookies } from '../lib/auth';
+
+await signOut();
+clearAuthCookies(Astro.cookies);
+
+return Astro.redirect('/login');
+---

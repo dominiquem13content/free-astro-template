@@ -1,0 +1,51 @@
+---
+import BaseHead from '../../../components/BaseHead.astro';
+import Header from '../../../components/sections/Header.astro';
+import Footer from '../../../components/sections/Footer.astro';
+import PostCard from '../../../components/ui/card/PostCard.astro';
+import { supabase } from '../../../lib/supabase';
+
+export async function getStaticPaths() {
+  const { data: authors } = await supabase
+    .from('authors')
+    .select('slug');
+
+  return (authors || []).map((author) => ({ params: { slug: author.slug } }));
+}
+
+const { slug } = Astro.params;
+
+const { data: authorData } = await supabase
+  .from('authors')
+  .select('*')
+  .eq('slug', slug)
+  .single();
+
+const { data: posts } = await supabase
+  .from('posts')
+  .select('*, author:authors(name, slug), category:categories(name, slug)')
+  .eq('author_id', authorData?.id)
+  .eq('published', true)
+  .order('published_at', { ascending: false });
+
+const authorName = authorData?.name || 'Author';
+---
+<html lang="en" data-theme="dark" class="dark">
+  <head>
+    <BaseHead title={`Articles by ${authorName}`} description={`Posts written by ${authorName}`} />
+  </head>
+  <body>
+    <Header />
+    <main class="mx-auto max-w-6xl px-4 py-10 space-y-6">
+      <h1 class="text-3xl font-bold">Articles by {authorName}</h1>
+      <div class="blog-grid">
+        {posts.map((p) => (
+          <PostCard post={p} />
+        ))}
+      </div>
+    </main>
+    <Footer />
+  </body>
+</html>
+
+

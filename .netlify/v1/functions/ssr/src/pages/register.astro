@@ -1,0 +1,164 @@
+---
+export const prerender = false;
+
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/sections/Header.astro';
+import Footer from '../components/sections/Footer.astro';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import { signUp, validateEmail, validatePassword, getCurrentUser } from '../lib/auth';
+
+const currentUser = await getCurrentUser(Astro.cookies);
+
+if (currentUser) {
+  return Astro.redirect('/cms-admin');
+}
+
+let errorMessage = '';
+let formData: { email?: string; fullName?: string } = {};
+
+if (Astro.request.method === 'POST') {
+  try {
+    const data = await Astro.request.formData();
+    const email = data.get('email')?.toString() || '';
+    const password = data.get('password')?.toString() || '';
+    const confirmPassword = data.get('confirmPassword')?.toString() || '';
+    const fullName = data.get('fullName')?.toString() || '';
+
+    formData = { email, fullName };
+
+    if (!email || !password || !confirmPassword) {
+      errorMessage = 'All fields are required.';
+    } else if (!validateEmail(email)) {
+      errorMessage = 'Please enter a valid email address.';
+    } else if (password !== confirmPassword) {
+      errorMessage = 'Passwords do not match.';
+    } else {
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.valid) {
+        errorMessage = passwordValidation.message || 'Invalid password.';
+      } else {
+        const { data: signUpData, error } = await signUp(email, password, fullName);
+
+        if (error) {
+          if (error.message.includes('already registered')) {
+            errorMessage = 'An account with this email already exists.';
+          } else {
+            errorMessage = error.message;
+          }
+        } else if (signUpData.user) {
+          return Astro.redirect('/login?registered=true');
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Registration error:', error);
+    errorMessage = 'An unexpected error occurred. Please try again.';
+  }
+}
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead title={`Register - ${SITE_TITLE}`} description={SITE_DESCRIPTION} />
+  </head>
+  <body>
+    <Header />
+    <main class="container mx-auto px-4 py-12 max-w-md">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+        <h1 class="text-3xl font-bold mb-6 text-center">Create Account</h1>
+
+        {errorMessage && (
+          <div class="mb-4 p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 rounded">
+            {errorMessage}
+          </div>
+        )}
+
+        <form method="POST">
+          <div class="mb-4">
+            <label for="fullName" class="block text-sm font-medium mb-2">
+              Full Name
+            </label>
+            <input
+              type="text"
+              id="fullName"
+              name="fullName"
+              value={formData.fullName || ''}
+              autocomplete="name"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+            />
+          </div>
+
+          <div class="mb-4">
+            <label for="email" class="block text-sm font-medium mb-2">
+              Email
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              required
+              value={formData.email || ''}
+              autocomplete="email"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+            />
+          </div>
+
+          <div class="mb-4">
+            <label for="password" class="block text-sm font-medium mb-2">
+              Password
+            </label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              autocomplete="new-password"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Must be at least 8 characters with uppercase, lowercase, and numbers
+            </p>
+          </div>
+
+          <div class="mb-6">
+            <label for="confirmPassword" class="block text-sm font-medium mb-2">
+              Confirm Password
+            </label>
+            <input
+              type="password"
+              id="confirmPassword"
+              name="confirmPassword"
+              required
+              autocomplete="new-password"
+              class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700"
+            />
+          </div>
+
+          <button
+            type="submit"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+          >
+            Create Account
+          </button>
+        </form>
+
+        <div class="mt-6 text-center">
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            Already have an account?
+            <a href="/login" class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
+              Sign in here
+            </a>
+          </p>
+        </div>
+
+        <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p class="text-sm text-blue-800 dark:text-blue-200">
+            <strong>Note:</strong> New accounts are created with "viewer" role by default. Contact an administrator to upgrade your permissions.
+          </p>
+        </div>
+      </div>
+    </main>
+    <Footer />
+  </body>
+</html>

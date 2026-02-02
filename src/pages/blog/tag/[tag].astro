@@ -1,21 +1,44 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseHead from '../../../components/BaseHead.astro';
 import Header from '../../../components/sections/Header.astro';
 import Footer from '../../../components/sections/Footer.astro';
 import PostCard from '../../../components/ui/card/PostCard.astro';
-import { slugifyTag } from '../../../lib/slug';
-import { getTagMeta } from '../../../data/tags';
+import { supabase } from '../../../lib/supabase';
 
 export async function getStaticPaths() {
-  const posts = await getCollection('blog');
-  const tags = [...new Set(posts.flatMap((p) => p.data.tags || []))];
-  return tags.map((tag) => ({ params: { tag: slugifyTag(tag) } }));
+  const { data: tags } = await supabase
+    .from('tags')
+    .select('slug');
+
+  return (tags || []).map((t) => ({ params: { tag: t.slug } }));
 }
 
 const { tag } = Astro.params;
-const posts = (await getCollection('blog')).filter((p) => (p.data.tags || []).some(t => slugifyTag(t) === tag));
-const meta = getTagMeta(tag);
+
+const { data: tagData } = await supabase
+  .from('tags')
+  .select('*')
+  .eq('slug', tag)
+  .single();
+
+const { data: postTags } = await supabase
+  .from('post_tags')
+  .select('post_id')
+  .eq('tag_id', tagData?.id);
+
+const postIds = postTags?.map(pt => pt.post_id) || [];
+
+const { data: posts } = await supabase
+  .from('posts')
+  .select('*, author:authors(name, slug), category:categories(name, slug)')
+  .in('id', postIds)
+  .eq('published', true)
+  .order('published_at', { ascending: false });
+
+const meta = {
+  title: tagData?.name || 'Tag',
+  description: `Posts tagged with ${tagData?.name || 'this tag'}`,
+};
 ---
 <html lang="en" data-theme="dark" class="dark">
   <head>

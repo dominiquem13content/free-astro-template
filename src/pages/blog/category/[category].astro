@@ -1,27 +1,37 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseHead from '../../../components/BaseHead.astro';
 import Header from '../../../components/sections/Header.astro';
 import Footer from '../../../components/sections/Footer.astro';
 import PostCard from '../../../components/ui/card/PostCard.astro';
-import { getCategoryMeta, slugifyCategory } from '../../../data/categories';
+import { supabase } from '../../../lib/supabase';
 
 export async function getStaticPaths() {
-  const posts = await getCollection('blog');
-  const categories = [
-    ...new Set(
-      posts
-        .map((p) => p.data.category || null)
-        .filter((v): v is string => Boolean(v))
-        .map((name) => slugifyCategory(name))
-    ),
-  ];
-  return categories.map((category) => ({ params: { category } }));
+  const { data: categories } = await supabase
+    .from('categories')
+    .select('slug');
+
+  return (categories || []).map((cat) => ({ params: { category: cat.slug } }));
 }
 
 const { category } = Astro.params;
-const posts = (await getCollection('blog')).filter((p) => slugifyCategory(p.data.category || '') === category);
-const meta = getCategoryMeta(category);
+
+const { data: categoryData } = await supabase
+  .from('categories')
+  .select('*')
+  .eq('slug', category)
+  .single();
+
+const { data: posts } = await supabase
+  .from('posts')
+  .select('*, author:authors(name, slug), category:categories(name, slug)')
+  .eq('category_id', categoryData?.id)
+  .eq('published', true)
+  .order('published_at', { ascending: false });
+
+const meta = {
+  title: categoryData?.name || 'Category',
+  description: categoryData?.description || 'Posts in this category',
+};
 ---
 <html lang="en" data-theme="dark" class="dark">
   <head>

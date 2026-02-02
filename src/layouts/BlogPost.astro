@@ -1,6 +1,4 @@
 ---
-import { Image } from 'astro:assets';
-import type { CollectionEntry } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/sections/Footer.astro';
 import FormattedDate from '../components/FormattedDate.astro';
@@ -9,10 +7,21 @@ import PostMeta from '../components/ui/meta/PostMeta.astro';
 import ShareButtons from '../components/ui/share/ShareButtons.astro';
 import PostNav from '../components/ui/nav/PostNav.astro';
 
-type BlogData = CollectionEntry<'blog'>['data'];
-type Props = BlogData & { showHeader?: boolean; prevPost?: { id: string; title: string } | null; nextPost?: { id: string; title: string } | null; readingTimeMin?: number };
+interface Props {
+  title: string;
+  description: string;
+  pubDate: Date;
+  updatedDate?: Date;
+  heroImage?: string | null;
+  author?: string;
+  tags?: string[];
+  showHeader?: boolean;
+  prevPost?: { id: string; title: string } | null;
+  nextPost?: { id: string; title: string } | null;
+  readingTimeMin?: number;
+}
 
-const { title, description, pubDate, updatedDate, heroImage, showHeader = true, prevPost = null, nextPost = null, readingTimeMin = 0 } = Astro.props as Props;
+const { title, description, pubDate, updatedDate, heroImage, author, tags, showHeader = true, prevPost = null, nextPost = null, readingTimeMin = 0 } = Astro.props;
 ---
 
 <html lang="en" data-theme="dark" class="dark">
@@ -20,10 +29,10 @@ const { title, description, pubDate, updatedDate, heroImage, showHeader = true, 
 		<BaseHead title={title} description={description} image={heroImage} />
 		<meta property="og:type" content="article" />
 		<!-- Article specific OG meta -->
-		{pubDate && <meta property="article:published_time" content={new Date(pubDate).toISOString()} />}
-		{updatedDate && <meta property="article:modified_time" content={new Date(updatedDate).toISOString()} />}
-		<meta property="article:author" content={Astro.props.author || 'Site Author'} />
-		{Array.isArray(Astro.props.tags) && Astro.props.tags.map((t) => (
+		{pubDate && <meta property="article:published_time" content={pubDate.toISOString()} />}
+		{updatedDate && <meta property="article:modified_time" content={updatedDate.toISOString()} />}
+		<meta property="article:author" content={author || 'Site Author'} />
+		{Array.isArray(tags) && tags.map((t) => (
 		  <meta property="article:tag" content={t} />
 		))}
 
@@ -33,10 +42,10 @@ const { title, description, pubDate, updatedDate, heroImage, showHeader = true, 
 		  '@type': 'Article',
 		  headline: title,
 		  description,
-		  image: Astro.props.heroImage ? new URL(Astro.props.heroImage.src, Astro.site).toString() : undefined,
-		  datePublished: pubDate ? new Date(pubDate).toISOString() : undefined,
-		  dateModified: updatedDate ? new Date(updatedDate).toISOString() : undefined,
-		  author: [{ '@type': 'Person', name: Astro.props.author || 'Site Author' }],
+		  image: heroImage || undefined,
+		  datePublished: pubDate ? pubDate.toISOString() : undefined,
+		  dateModified: updatedDate ? updatedDate.toISOString() : undefined,
+		  author: [{ '@type': 'Person', name: author || 'Site Author' }],
 		  publisher: { '@type': 'Organization', name: 'guihubie.com' },
 		  mainEntityOfPage: new URL(Astro.url.pathname, Astro.site).toString(),
 		  url: new URL(Astro.url.pathname, Astro.site).toString(),
@@ -102,7 +111,7 @@ const { title, description, pubDate, updatedDate, heroImage, showHeader = true, 
 			<article>
                 {showHeader && (
                     <div class="hero-image">
-                        {heroImage && <Image width={1020} height={510} src={heroImage} alt="" />}
+                        {heroImage && <img width="1020" height="510" src={heroImage} alt="" />}
                     </div>
                 )}
                 <div class="prose">
@@ -123,7 +132,7 @@ const { title, description, pubDate, updatedDate, heroImage, showHeader = true, 
                         </div>
                     )}
                     <ShareButtons title={title} url={Astro.url.toString()} />
-					<PostMeta pubDate={pubDate} readingTimeMin={readingTimeMin} authorName={Astro.props.author || 'Site Author'} />
+					<PostMeta pubDate={pubDate} readingTimeMin={readingTimeMin} authorName={author || 'Site Author'} />
                     <slot />
                     <PostNav prev={prevPost} next={nextPost} />
                 </div>

@@ -1,30 +1,71 @@
 ---
-import { type CollectionEntry, getCollection, render } from 'astro:content';
 import BlogPost from '../../layouts/BlogPost.astro';
 import { calculateReadingTimeFromHtml } from '../../lib/reading';
+import { supabase } from '../../lib/supabase';
+import { parseMarkdown } from '../../lib/markdown';
 
 export async function getStaticPaths() {
-	const posts = await getCollection('blog');
+	const { data: posts } = await supabase
+		.from('posts')
+		.select('*')
+		.eq('published', true)
+		.order('published_at', { ascending: false });
+
+	if (!posts) return [];
+
 	return posts.map((post) => ({
-		params: { slug: post.id },
-		props: post,
+		params: { slug: post.slug },
+		props: { post },
 	}));
 }
-type Props = CollectionEntry<'blog'>;
 
-const post = Astro.props;
-const posts = await getCollection('blog');
-// Sort by date descending for navigation
-const sorted = posts.slice().sort((a, b) => +b.data.pubDate - +a.data.pubDate);
+const { post } = Astro.props;
+
+const { data: allPosts } = await supabase
+	.from('posts')
+	.select('*')
+	.eq('published', true)
+	.order('published_at', { ascending: false });
+
+const sorted = allPosts || [];
 const index = sorted.findIndex((p) => p.id === post.id);
-const prev = index < sorted.length - 1 ? { id: sorted[index + 1].id, title: sorted[index + 1].data.title } : null;
-const next = index > 0 ? { id: sorted[index - 1].id, title: sorted[index - 1].data.title } : null;
+const prev = index < sorted.length - 1 ? { id: sorted[index + 1].slug, title: sorted[index + 1].title } : null;
+const next = index > 0 ? { id: sorted[index - 1].slug, title: sorted[index - 1].title } : null;
 
-const { Content } = await render(post);
-const html = await Astro.slots.render('default');
-const readingTimeMin = calculateReadingTimeFromHtml(html ?? '');
+const { data: author } = await supabase
+	.from('authors')
+	.select('*')
+	.eq('id', post.author_id)
+	.single();
+
+const { data: category } = await supabase
+	.from('categories')
+	.select('*')
+	.eq('id', post.category_id)
+	.maybeSingle();
+
+const { data: postTagsData } = await supabase
+	.from('post_tags')
+	.select('tag_id, tags(name)')
+	.eq('post_id', post.id);
+
+const tags = postTagsData?.map((pt: any) => pt.tags.name) || [];
+
+const htmlContent = await parseMarkdown(post.content);
+const readingTimeMin = calculateReadingTimeFromHtml(htmlContent);
 ---
 
-<BlogPost {...post.data} prevPost={prev} nextPost={next} readingTimeMin={readingTimeMin}>
-  <Content />
+<BlogPost
+	title={post.meta_title || post.title}
+	description={post.meta_description || post.excerpt || ''}
+	pubDate={new Date(post.published_at || post.created_at)}
+	updatedDate={post.updated_at ? new Date(post.updated_at) : undefined}
+	heroImage={post.hero_image}
+	author={author?.name}
+	tags={tags}
+	prevPost={prev}
+	nextPost={next}
+	readingTimeMin={readingTimeMin}
+>
+	<div set:html={htmlContent} />
 </BlogPost>

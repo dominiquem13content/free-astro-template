@@ -1,5 +1,4 @@
 ---
-import { getCollection, render } from 'astro:content';
 import BaseHead from '../../components/BaseHead.astro';
 import Footer from '../../components/sections/Footer.astro';
 import Header from '../../components/sections/Header.astro';
@@ -9,17 +8,26 @@ import BlogPagination from '../../components/ui/nav/BlogPagination.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../../consts';
 import FeaturedPost from '../../components/ui/card/FeaturedPost.astro';
 import { calculateReadingTimeFromHtml } from '../../lib/reading';
+import { supabase } from '../../lib/supabase';
+import { parseMarkdown } from '../../lib/markdown';
 
 const PAGE_SIZE = 6;
-const posts = (await getCollection('blog')).sort((a,b)=>+b.data.pubDate-+a.data.pubDate);
+
+const { data: allPosts } = await supabase
+  .from('posts')
+  .select('*, author:authors(name, slug), category:categories(name, slug)')
+  .eq('published', true)
+  .order('published_at', { ascending: false });
+
+const posts = allPosts || [];
 const [featured, ...rest] = posts;
 const firstPagePosts = rest.slice(0, PAGE_SIZE);
 const totalPages = Math.max(1, Math.ceil(rest.length / PAGE_SIZE));
+
 let featuredReading = 0;
 if (featured) {
-  const { Content } = await render(featured);
-  const html = await Astro.slots.render('default');
-  featuredReading = calculateReadingTimeFromHtml(html ?? '');
+  const htmlContent = await parseMarkdown(featured.content);
+  featuredReading = calculateReadingTimeFromHtml(htmlContent);
 }
 ---
 
@@ -41,8 +49,15 @@ if (featured) {
               </section>
             )}
 
-            <BlogAllArticles posts={firstPagePosts} />
-            <BlogPagination currentPage={1} totalPages={totalPages} />
+            {firstPagePosts.length > 0 ? (
+              <BlogAllArticles posts={firstPagePosts} />
+            ) : !featured && (
+              <div class="text-center py-12">
+                <p class="text-xl text-gray-400">No blog posts yet. Check back soon!</p>
+              </div>
+            )}
+
+            {totalPages > 1 && <BlogPagination currentPage={1} totalPages={totalPages} />}
         </main>
         <Footer />
 	</body>

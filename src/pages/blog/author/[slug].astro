@@ -1,24 +1,34 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseHead from '../../../components/BaseHead.astro';
 import Header from '../../../components/sections/Header.astro';
 import Footer from '../../../components/sections/Footer.astro';
 import PostCard from '../../../components/ui/card/PostCard.astro';
-import { slugifyTag as slugify } from '../../../lib/slug';
+import { supabase } from '../../../lib/supabase';
 
 export async function getStaticPaths() {
-  const posts = await getCollection('blog');
-  const authorSlugs = [
-    ...new Set(
-      posts.map((p) => slugify(p.data.author || 'Site Author'))
-    ),
-  ];
-  return authorSlugs.map((slug) => ({ params: { slug } }));
+  const { data: authors } = await supabase
+    .from('authors')
+    .select('slug');
+
+  return (authors || []).map((author) => ({ params: { slug: author.slug } }));
 }
 
 const { slug } = Astro.params;
-const posts = (await getCollection('blog')).filter((p) => slugify(p.data.author || 'Site Author') === slug);
-const authorName = posts[0]?.data.author || 'Site Author';
+
+const { data: authorData } = await supabase
+  .from('authors')
+  .select('*')
+  .eq('slug', slug)
+  .single();
+
+const { data: posts } = await supabase
+  .from('posts')
+  .select('*, author:authors(name, slug), category:categories(name, slug)')
+  .eq('author_id', authorData?.id)
+  .eq('published', true)
+  .order('published_at', { ascending: false });
+
+const authorName = authorData?.name || 'Author';
 ---
 <html lang="en" data-theme="dark" class="dark">
   <head>

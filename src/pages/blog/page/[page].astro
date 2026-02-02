@@ -1,27 +1,37 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseHead from '../../../components/BaseHead.astro';
 import Header from '../../../components/sections/Header.astro';
 import Footer from '../../../components/sections/Footer.astro';
 import BlogHero from '../../../components/sections/BlogHero.astro';
 import BlogAllArticles from '../../../components/sections/BlogAllArticles.astro';
 import BlogPagination from '../../../components/ui/nav/BlogPagination.astro';
+import { supabase } from '../../../lib/supabase';
 
 export async function getStaticPaths() {
   const PAGE_SIZE = 6;
-  const posts = (await getCollection('blog')).sort((a, b) => +b.data.pubDate - +a.data.pubDate);
-  const totalPages = Math.max(1, Math.ceil(posts.length / PAGE_SIZE));
+  const { data: posts, count } = await supabase
+    .from('posts')
+    .select('*', { count: 'exact' })
+    .eq('published', true);
+
+  const totalPages = Math.max(1, Math.ceil((count || 0) / PAGE_SIZE));
   return Array.from({ length: totalPages - 1 }, (_, i) => ({ params: { page: String(i + 2) } }));
 }
 
 const PAGE_SIZE = 6;
-const posts = (await getCollection('blog')).sort((a, b) => +b.data.pubDate - +a.data.pubDate);
+const { data: posts } = await supabase
+  .from('posts')
+  .select('*, author:authors(name, slug), category:categories(name, slug)')
+  .eq('published', true)
+  .order('published_at', { ascending: false });
+
+const allPosts = posts || [];
 const { page } = Astro.params;
 const currentPage = Math.max(1, parseInt(page || '1', 10));
 const start = (currentPage - 1) * PAGE_SIZE;
 const end = start + PAGE_SIZE;
-const pagePosts = posts.slice(start, end);
-const totalPages = Math.max(1, Math.ceil(posts.length / PAGE_SIZE));
+const pagePosts = allPosts.slice(start, end);
+const totalPages = Math.max(1, Math.ceil(allPosts.length / PAGE_SIZE));
 ---
 
 <html lang="en" data-theme="dark" class="dark">
